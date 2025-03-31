@@ -30,7 +30,7 @@ ATree::ATree()
 	// Branch thickness scales.
 	RootBranchThickness = 1.0f;
 	LastBranchThickness = 0.05f;
-	BranchLevelThicknessFactor = 2.0f;
+	BranchLevelThicknessFactor = 0.7f;
 
 	simulator = ParametricSimulator(species_id, GetWorld());
 
@@ -102,8 +102,6 @@ void ATree::GenerateTree()
 void ATree::RefreshMesh(const State& state) {
 	FRandomStream random;
 
-	// TODO do not create new component if such component already exists - check smh
-	// TODO clear splines completely in the clearTree() method
 	for (int32 idx = 0; idx < state.branches.Num(); idx++) {
 
 		// Calculate max number of nodes in the current branch
@@ -123,74 +121,78 @@ void ATree::RefreshMesh(const State& state) {
 		SplineComponent->ClearSplinePoints();
 
 		// Iterate over our input points and add spline points to the spline component
-		for (int n_idx = 0; n_idx < state.branches[idx].nodes.Num() - 1; n_idx++)
-		{
-			auto point = state.branches[idx].nodes[n_idx].coordinates;
+		auto num_points = state.branches[idx].nodes.Num();
+		if (num_points > 1) {
+			auto point = state.branches[idx].nodes[0].coordinates;
 			int32 AddIdx = SplineComponent->GetNumberOfSplinePoints();
 			SplineComponent->AddSplinePointAtIndex(point, AddIdx, ESplineCoordinateSpace::Local);
 
-			FVector startLocation, startTangent;
-			SplineComponent->GetLocalLocationAndTangentAtSplinePoint(n_idx, startLocation, startTangent);
+			for (int n_idx = 1; n_idx < num_points; n_idx++)
+			{
+				point = state.branches[idx].nodes[n_idx].coordinates;
+				AddIdx = SplineComponent->GetNumberOfSplinePoints();
+				SplineComponent->AddSplinePointAtIndex(point, AddIdx, ESplineCoordinateSpace::Local);
 
-			FVector endLocation, endTangent;
-			SplineComponent->GetLocalLocationAndTangentAtSplinePoint(n_idx + 1, endLocation, endTangent);
+				FVector startLocation, startTangent;
+				SplineComponent->GetLocalLocationAndTangentAtSplinePoint(n_idx-1, startLocation, startTangent);
 
-			// assign mesh to each spline point
-			FName name = FName(SplineComponent->GetFName().ToString() + "_" + FString::FormatAsNumber(n_idx) + "_smc");
-			USplineMeshComponent* smc = (USplineMeshComponent*)GetDefaultSubobjectByName(name);
-			
-			if (smc == NULL) {
-				smc = NewObject<USplineMeshComponent>(this, name);
-				smc->SetMobility(EComponentMobility::Static);
-				smc->SetForwardAxis(ESplineMeshAxis::Type::Z);
-				smc->AttachToComponent(SplineComponent, FAttachmentTransformRules::KeepRelativeTransform);
-				smc->ComponentTags.Add(TAG_Branch);
+				FVector endLocation, endTangent;
+				SplineComponent->GetLocalLocationAndTangentAtSplinePoint(n_idx, endLocation, endTangent);
 
-				// TODO WA the end_tangent problem && clean the meshes from the smcs on the state restore 
-				smc->SetStartAndEnd(
-					state.branches[idx].nodes[n_idx].coordinates, startTangent,
-					state.branches[idx].nodes[n_idx+1].coordinates, endTangent);
+				// assign mesh to each spline point
+				FName name = FName(SplineComponent->GetFName().ToString() + "_" + FString::FormatAsNumber(n_idx) + "_smc");
+				USplineMeshComponent* smc = (USplineMeshComponent*)GetDefaultSubobjectByName(name);
 
-				if (TreeStaticMesh) {
-					smc->SetStaticMesh(TreeStaticMesh);
+				if (smc == NULL) {
+					smc = NewObject<USplineMeshComponent>(this, name);
+					smc->SetMobility(EComponentMobility::Static);
+					smc->SetForwardAxis(ESplineMeshAxis::Type::Z);
+					smc->AttachToComponent(SplineComponent, FAttachmentTransformRules::KeepRelativeTransform);
+					smc->ComponentTags.Add(TAG_Branch);
+
+					smc->SetStartAndEnd(
+						startLocation, startTangent, endLocation, endTangent);
+
+					if (TreeStaticMesh) {
+						smc->SetStaticMesh(TreeStaticMesh);
+					}
+					if (TreeMaterial) {
+						smc->SetMaterial(0, TreeMaterial);
+					}
 				}
-				if (TreeMaterial) {
-					smc->SetMaterial(0, TreeMaterial);
-				}
+
+				UpdateBranchThickness(smc, state.branches[idx], n_idx, treeHeight);
 			}
+			// Create a plane with leaves at the end of each branch.
+			if (state.branches[idx].state == BranchState::Active) {
+				Node node = state.branches[idx].nodes.Last();
+				FName name = FName(SplineComponent->GetFName().ToString() + "_leaves_mc");
+				UStaticMeshComponent* mc = (UStaticMeshComponent*)GetDefaultSubobjectByName(name);
 
-			UpdateBranchThickness(smc, state.branches[idx], n_idx, treeHeight);
-		}
+				if (mc == NULL) {
+					mc = NewObject<UStaticMeshComponent>(this, name);
+					mc->SetMobility(EComponentMobility::Static);
+					mc->AttachToComponent(SplineComponent, FAttachmentTransformRules::KeepRelativeTransform);
+					mc->ComponentTags.Add(TAG_Leaves);
 
-		// Create a plane with leaves at the end of each branch.
-		if (state.branches[idx].state == BranchState::Active) {
-			Node node = state.branches[idx].nodes.Last();
-			FName name = FName(SplineComponent->GetFName().ToString() + "_leaves_mc");
-			UStaticMeshComponent* mc = (UStaticMeshComponent*)GetDefaultSubobjectByName(name);
+					FVector location, tangent;
+					SplineComponent->GetLocalLocationAndTangentAtSplinePoint(SplineComponent->GetNumberOfSplinePoints() - 1, location, tangent);
+					mc->SetRelativeLocation(location);
 
-			if (mc == NULL) {
-				mc = NewObject<UStaticMeshComponent>(this, name);
-				mc->SetMobility(EComponentMobility::Static);
-				mc->AttachToComponent(SplineComponent, FAttachmentTransformRules::KeepRelativeTransform);
-				mc->ComponentTags.Add(TAG_Leaves);
+					FRotator rotation = tangent.Rotation();
+					rotation += FRotator(0, 0, random.FRandRange(0, 360));
+					mc->SetRelativeRotation(rotation);
 
-				FVector location, tangent;
-				SplineComponent->GetLocalLocationAndTangentAtSplinePoint(SplineComponent->GetNumberOfSplinePoints() - 1, location, tangent);
-				mc->SetRelativeLocation(location);
-
-				FRotator rotation = tangent.Rotation();
-				rotation += FRotator(0, 0, random.FRandRange(0, 360));
-				mc->SetRelativeRotation(rotation);
-
-				if (LeafStaticMesh) {
-					mc->SetStaticMesh(LeafStaticMesh);
+					if (LeafStaticMesh) {
+						mc->SetStaticMesh(LeafStaticMesh);
+					}
+					if (LeafMaterial) {
+						mc->SetMaterial(0, LeafMaterial);
+					}
 				}
-				if (LeafMaterial) {
-					mc->SetMaterial(0, LeafMaterial);
-				}
+
+				mc->SetRelativeScale3D(FVector(LeafScale));
 			}
-
-			mc->SetRelativeScale3D(FVector(LeafScale));
 		}
 
 		// ensure spline is updated

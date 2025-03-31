@@ -16,7 +16,7 @@ Species::Species(Species_ID newId)
 	this->id = newId;
 	if (id == ACACIA) {
 		this->initialGrowthRate = 1.5f;
-		this->apicalControl = 2.4f;
+		this->apicalControl = 0.94f;
 		this->apicalControlAgeFactor = 0.92f;
 		this->internodeBaseLength = 0.92f;
 		this->internodeLengthAgeFactor = 0.96f;
@@ -35,11 +35,14 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 3.5f;
 		this->apicalDominanceDistance = 0.9f;
 		this->apicalDominanceAge = 0.9f;
+
+		this->pruningFactor = 0.05f; 
+		this->lightBlockingFactor = 0.5f;
 	}
 	if (id == APPLE) {
 		this->initialGrowthRate = 2.98f;
 		this->apicalControl = 2.2f;
-		this->apicalControlAgeFactor = 0.5f;
+		this->apicalControlAgeFactor = 0.85f;
 		this->internodeBaseLength = 0.55f;
 		this->internodeLengthAgeFactor = 0.97f;
 		this->apicalAngleVariance = 20;
@@ -60,6 +63,9 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 3.13f;
 		this->apicalDominanceDistance = 0.13f;
 		this->apicalDominanceAge = 0.82f;
+
+		this->pruningFactor = 0.7f; 
+		this->lightBlockingFactor = 0.37f;
 	}
 	if (id == WILLOW) {
 		this->initialGrowthRate = 2.3f;
@@ -85,6 +91,9 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 0.38f;
 		this->apicalDominanceDistance = 0.9f;
 		this->apicalDominanceAge = 0.31f;
+
+		this->pruningFactor = 0.8f; 
+		this->lightBlockingFactor = 0.4f;
 	}
 	if (id == MAPLE) {
 		this->initialGrowthRate = 4.25f;
@@ -110,6 +119,9 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 4.87f;
 		this->apicalDominanceDistance = 0.98f;
 		this->apicalDominanceAge = 0.42f;
+
+		this->pruningFactor = 0.1f; 
+		this->lightBlockingFactor = 0.6f;
 	}
 	if (id == BIRCH) {
 		this->initialGrowthRate = 4.25f;
@@ -135,11 +147,14 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 4.87f;
 		this->apicalDominanceDistance = 0.98f;
 		this->apicalDominanceAge = 0.42f;
+
+		this->pruningFactor = 0.1f;
+		this->lightBlockingFactor = 0.6f;
 	}
 	if (id == OAK) {
 		this->initialGrowthRate = 3.0f;
 		this->apicalControl = 2.2f;
-		this->apicalControlAgeFactor = 0.5f;
+		this->apicalControlAgeFactor = 0.91f;
 		this->internodeBaseLength = 1.0f;
 		this->internodeLengthAgeFactor = 0.93f;
 		this->apicalAngleVariance = 20;
@@ -160,6 +175,9 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 3.13f;
 		this->apicalDominanceDistance = 0.13f;
 		this->apicalDominanceAge = 0.82f;
+
+		this->pruningFactor = 0.7f; 
+		this->lightBlockingFactor = 0.5f;
 	}
 	if (id == PINE) {
 		this->initialGrowthRate = 3.26f;
@@ -185,5 +203,8 @@ Species::Species(Species_ID newId)
 		this->apicalDominanceBase = 0.01f;
 		this->apicalDominanceDistance = 0.9f;
 		this->apicalDominanceAge = 0.87f;
+
+		this->pruningFactor = 0.12f;
+		this->lightBlockingFactor = 0.3f;
 	}
 }

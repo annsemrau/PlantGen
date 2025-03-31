@@ -28,6 +28,7 @@ public:
 	float initialGrowthRate;		// GR
 	float apicalControl;			// AC
 	float apicalControlAgeFactor;	// AC_AF
+
 	float internodeBaseLength;		// IBL
 	float internodeLengthAgeFactor;	// IL_AF
 	int	  apicalAngleVariance;		// AAV
@@ -46,6 +47,9 @@ public:
 	float apicalDominanceDistance;	// AD_DF
 	float apicalDominanceAge;		// AD_AF
 
+	float pruningFactor;			// PF
+
+	float lightBlockingFactor;		// LBF
 	Species();
 	Species(Species_ID);
 	~Species();

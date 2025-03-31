@@ -88,6 +88,9 @@ State ParametricSimulator::GrowTree(const State& state, int age, bool useSDF)
 						node.levelOfBranch + 1,
 						rollAngle,
 						bendAngle);
+					if (node.levelOfBranch + 1 >maxBranchLevel) {
+						maxBranchLevel = node.levelOfBranch + 1;
+					}
 
 					/*DrawDebugLine(
 						world,
@@ -107,17 +110,24 @@ State ParametricSimulator::GrowTree(const State& state, int age, bool useSDF)
 
 		// grow apically only for living branches
 		if (branch.nodes.Last().isAlive) {
-			bool doesGrow = checkApicalGrowth(branch.nodes.Last().coordinates);
-			if (doesGrow) {
-				// grow a new apical shoot
-				branch.nodes.Append(CalculateNextBuds(branch.nodes.Last(), age));
+			float illumination = computeIllumination(branch.nodes.Last().coordinates);
+
+			if (illumination < species.pruningFactor) {
+				branch.nodes.Last().isAlive = false;
+			}
+			else {
+				bool doesGrow = checkApicalGrowth(illumination);
+				if (doesGrow) {
+					// grow a new apical shoot
+					branch.nodes.Append(CalculateNextBuds(branch.nodes.Last(), age));
+				}
 			}
 		}
 
 		newState.branches.Add(std::move(branch));
 
 		// check to kill apical bud
-		if (species.apicalExtinctionRate > 0.0) {
+		if (species.apicalExtinctionRate > 0.0 && branch.nodes.Last().isAlive) {
 			bool doesDie = checkState(species.apicalExtinctionRate);
 			if (doesDie) {
 				branch.state = BranchState::Stale;
@@ -140,7 +150,7 @@ TArray<Node> ParametricSimulator::CalculateNextBuds(const Node previous, const i
 		actualGrowthRate = species.initialGrowthRate / FMath::Pow(actualApicalControl, previous.levelOfBranch);
 	}
 	else {
-		actualGrowthRate = species.initialGrowthRate / FMath::Pow(actualApicalControl, maxBranchLevel);
+		actualGrowthRate = species.initialGrowthRate / FMath::Pow(actualApicalControl, previous.levelOfBranch - maxBranchLevel);
 	}
 
 	float actualInternodeLength = species.internodeBaseLength * FMath::Pow(species.internodeLengthAgeFactor, age);
@@ -148,15 +158,23 @@ TArray<Node> ParametricSimulator::CalculateNextBuds(const Node previous, const i
 	float shootLength = actualInternodeLength * NODE_SCALE;
 
 	// apical angle variance
-	std::normal_distribution d{ 0.f, (float)species.apicalAngleVariance };
+	float aav = species.apicalAngleVariance;
+	std::normal_distribution d{ 0.f, aav };
 
 	TArray<Node> nodes;
+
+	FQuat currentOrientation = previous.orientation;
+	FVector coords = previous.coordinates;
+
 	for (int i = 0; i < numOfInternodes; i++) {
-		FQuat varOrientation(FRotator(d(gen), FMath::RandRange(0, species.apicalAngleVariance), 0));
-		FQuat currentOrientation = (previous.orientation * varOrientation);
+		if (i > 100) {
+			break;
+		}
+
+		FQuat varOrientation(FRotator(d(gen), FMath::RandRange(0, 360), 0));
+		currentOrientation *= varOrientation;
 
 		FVector currentHeading = currentOrientation.RotateVector(FVector::UpVector);
-		FVector coords = previous.coordinates;
 		coords += (currentHeading * shootLength);
 
 		UE_LOG(TreeGenLog, Log,
@@ -184,8 +202,7 @@ bool ParametricSimulator::checkState(const float probabilityOfDeath) {
 	return prob < probabilityOfDeath;
 }
 
-bool ParametricSimulator::checkApicalGrowth(FVector coords) {
-	float illumination = computeIllumination(coords);
+bool ParametricSimulator::checkApicalGrowth(float illumination) {
 
 	auto doesGrow = checkState(FMath::Pow(illumination, species.apicalLightFactor));
 
@@ -294,7 +311,7 @@ float ParametricSimulator::computeIllumination(FVector coords) {
 		}
 	}
 
-	return  float(miss) / (rayDensity * 3);
+	return  float(miss) / (rayDensity * 3 * species.lightBlockingFactor) ;
 }
 
 float ParametricSimulator::sdSphere(FVector p) {
